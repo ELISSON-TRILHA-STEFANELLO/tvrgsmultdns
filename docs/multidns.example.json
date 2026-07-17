@@ -1,0 +1,7 @@
+{
+  "hosts": [
+    { "name": "Servidor 1", "url": "http://dns1.seudominio.com:8080", "priority": 1 },
+    { "name": "Servidor 2", "url": "http://dns2.seudominio.com:8080", "priority": 2 },
+    { "name": "Servidor 3", "url": "http://dns3.seudominio.com:8080", "priority": 3 }
+  ]
+}
