@@ -77,10 +77,10 @@ class MultiDnsRepositoryImpl @Inject constructor(
             when (remoteResult) {
                 is Result.Success -> {
                     context.multiDnsDataStore.edit { store ->
-                        store[KEY_CACHED_JSON] = remoteResult.rawJson
+                        store[KEY_CACHED_JSON] = remoteResult.data.rawJson
                         store[KEY_CACHED_AT] = System.currentTimeMillis()
                     }
-                    Result.success(remoteResult.hosts)
+                    Result.success(remoteResult.data.hosts)
                 }
 
                 is Result.Error -> {
