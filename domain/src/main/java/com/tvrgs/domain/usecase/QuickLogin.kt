@@ -4,6 +4,10 @@ import com.tvrgs.domain.model.Provider
 import com.tvrgs.domain.model.Result
 import com.tvrgs.domain.repository.MultiDnsRepository
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 
 /**
  * Result of a quick-login attempt (username + password only, no server address).
@@ -27,6 +31,13 @@ class QuickLogin @Inject constructor(
 ) {
     companion object {
         private const val DEFAULT_PROVIDER_NAME = "TVRGS"
+
+        // Deliberately not tied to any ViewModel/screen: the quick-login screen navigates
+        // away as soon as the provider row is persisted (before the initial sync below
+        // finishes), which would otherwise cancel a still-running sync launched in a
+        // screen-scoped viewModelScope. Running the login+sync call here instead lets
+        // channels/movies/series/EPG keep syncing in the background after Home appears.
+        private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     suspend fun login(
@@ -61,46 +72,53 @@ class QuickLogin @Inject constructor(
                 .thenBy { it.priority }
         )
 
-        var lastErrorMessage: String? = null
+        // Runs on backgroundScope (not the caller's viewModelScope) so that if the UI
+        // navigates away from the login screen the moment the provider row is written —
+        // which happens here, mid-loop, before the initial sync inside loginXtream()
+        // finishes — the sync keeps running to completion (channels, then movies, then
+        // series, then EPG) instead of being cancelled along with the screen.
+        return backgroundScope.async {
+            var lastErrorMessage: String? = null
 
-        for (host in orderedHosts) {
-            onProgress?.invoke(host.name)
+            for (host in orderedHosts) {
+                onProgress?.invoke(host.name)
 
-            val result = validateAndAddProvider.loginXtream(
-                XtreamProviderSetupCommand(
-                    serverUrl = host.serverUrl,
-                    username = trimmedUsername,
-                    password = trimmedPassword,
-                    name = DEFAULT_PROVIDER_NAME,
-                    xtreamFastSyncEnabled = true
+                val result = validateAndAddProvider.loginXtream(
+                    XtreamProviderSetupCommand(
+                        serverUrl = host.serverUrl,
+                        username = trimmedUsername,
+                        password = trimmedPassword,
+                        name = DEFAULT_PROVIDER_NAME,
+                        xtreamFastSyncEnabled = true
+                    )
                 )
-            )
 
-            when (result) {
-                is ValidateAndAddProviderResult.Success -> {
-                    multiDnsRepository.rememberWorkingHost(host.serverUrl)
-                    return QuickLoginResult.Success(result.provider)
-                }
+                when (result) {
+                    is ValidateAndAddProviderResult.Success -> {
+                        multiDnsRepository.rememberWorkingHost(host.serverUrl)
+                        return@async QuickLoginResult.Success(result.provider)
+                    }
 
-                is ValidateAndAddProviderResult.SavedWithWarning -> {
-                    multiDnsRepository.rememberWorkingHost(host.serverUrl)
-                    return QuickLoginResult.SavedWithWarning(result.provider, result.warning)
-                }
+                    is ValidateAndAddProviderResult.SavedWithWarning -> {
+                        multiDnsRepository.rememberWorkingHost(host.serverUrl)
+                        return@async QuickLoginResult.SavedWithWarning(result.provider, result.warning)
+                    }
 
-                is ValidateAndAddProviderResult.ValidationError -> {
-                    // Input itself is invalid (e.g. blank/too long) — this won't change by
-                    // trying a different host, so stop here instead of looping needlessly.
-                    return QuickLoginResult.ValidationError(result.message)
-                }
+                    is ValidateAndAddProviderResult.ValidationError -> {
+                        // Input itself is invalid (e.g. blank/too long) — this won't change by
+                        // trying a different host, so stop here instead of looping needlessly.
+                        return@async QuickLoginResult.ValidationError(result.message)
+                    }
 
-                is ValidateAndAddProviderResult.Error -> {
-                    lastErrorMessage = result.message
+                    is ValidateAndAddProviderResult.Error -> {
+                        lastErrorMessage = result.message
+                    }
                 }
             }
-        }
 
-        return QuickLoginResult.Error(
-            lastErrorMessage ?: "Usuário ou senha inválidos, ou nenhum servidor respondeu."
-        )
+            QuickLoginResult.Error(
+                lastErrorMessage ?: "Usuário ou senha inválidos, ou nenhum servidor respondeu."
+            )
+        }.await()
     }
 }
