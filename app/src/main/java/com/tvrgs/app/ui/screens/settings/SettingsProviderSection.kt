@@ -11,9 +11,11 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -26,6 +28,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.tvrgs.app.R
 import com.tvrgs.app.ui.components.TvEmptyState
+import com.tvrgs.app.ui.components.dialogs.PremiumDialog
+import com.tvrgs.app.ui.components.dialogs.PremiumDialogFooterButton
 import com.tvrgs.app.ui.interaction.TvClickableSurface
 import com.tvrgs.app.ui.theme.OnSurfaceDim
 import com.tvrgs.app.ui.theme.Primary
@@ -37,6 +41,7 @@ internal fun LazyListScope.providerSection(
     onAddProvider: () -> Unit,
     onEditProvider: (Provider) -> Unit,
     onNavigateToParentalControl: (Long) -> Unit,
+    onLogout: () -> Unit,
     viewModel: SettingsViewModel,
     providerState: SettingsProviderSectionState
 ) {
@@ -179,5 +184,67 @@ internal fun LazyListScope.providerSection(
                 )
             }
         }
+    }
+
+    if (uiState.providers.isNotEmpty()) {
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+            LogoutButton(onLogout = { viewModel.logout(onComplete = onLogout) })
+        }
+    }
+}
+
+@Composable
+private fun LogoutButton(onLogout: () -> Unit) {
+    var showConfirm by remember { mutableStateOf(false) }
+
+    TvClickableSurface(
+        onClick = { showConfirm = true },
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = com.tvrgs.app.ui.theme.ErrorColor.copy(alpha = 0.12f),
+            focusedContainerColor = com.tvrgs.app.ui.theme.ErrorColor.copy(alpha = 0.28f)
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.settings_logout),
+                style = MaterialTheme.typography.bodyLarge,
+                color = com.tvrgs.app.ui.theme.ErrorColor
+            )
+        }
+    }
+
+    if (showConfirm) {
+        PremiumDialog(
+            title = stringResource(R.string.settings_logout_confirm_title),
+            subtitle = stringResource(R.string.settings_logout_confirm_subtitle),
+            onDismissRequest = { showConfirm = false },
+            widthFraction = 0.48f,
+            heightFraction = null,
+            content = {},
+            footer = {
+                PremiumDialogFooterButton(
+                    label = stringResource(R.string.settings_cancel),
+                    onClick = { showConfirm = false }
+                )
+                PremiumDialogFooterButton(
+                    label = stringResource(R.string.settings_logout),
+                    onClick = {
+                        showConfirm = false
+                        onLogout()
+                    },
+                    destructive = true
+                )
+            }
+        )
     }
 }

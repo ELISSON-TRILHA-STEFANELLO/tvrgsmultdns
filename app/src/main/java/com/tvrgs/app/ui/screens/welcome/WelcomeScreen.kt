@@ -1,5 +1,6 @@
 package com.tvrgs.app.ui.screens.welcome
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,9 +23,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -32,7 +36,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -161,8 +164,6 @@ fun WelcomeScreen(
 
         when (hasProviders) {
             false -> WelcomeStartCard(
-                onNavigateToHome = onNavigateToHome,
-                onNavigateToSetup = onNavigateToSetup,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .padding(32.dp)
@@ -259,8 +260,6 @@ private fun WelcomeLoadingCard(
 
 @Composable
 private fun WelcomeStartCard(
-    onNavigateToHome: () -> Unit,
-    onNavigateToSetup: () -> Unit,
     modifier: Modifier = Modifier,
     loginViewModel: QuickLoginViewModel = hiltViewModel()
 ) {
@@ -279,15 +278,12 @@ private fun WelcomeStartCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            StatusPill(
-                label = stringResource(R.string.app_name),
-                containerColor = AppColors.BrandMuted
-            )
-            Text(
-                text = stringResource(R.string.welcome_login_title),
-                style = MaterialTheme.typography.headlineMedium,
-                color = AppColors.TextPrimary,
-                textAlign = TextAlign.Center
+            Image(
+                painter = painterResource(R.mipmap.ic_launcher_vault),
+                contentDescription = stringResource(R.string.app_name),
+                modifier = Modifier
+                    .size(88.dp)
+                    .clip(RoundedCornerShape(20.dp))
             )
             Text(
                 text = stringResource(R.string.welcome_login_subtitle),
@@ -339,18 +335,6 @@ private fun WelcomeStartCard(
                 } else {
                     Text(text = stringResource(R.string.welcome_login_button))
                 }
-            }
-
-            TvButton(
-                onClick = onNavigateToHome,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.colors(
-                    containerColor = Color.Transparent,
-                    focusedContainerColor = AppColors.SurfaceElevated,
-                    contentColor = AppColors.TextSecondary
-                )
-            ) {
-                Text(text = stringResource(R.string.welcome_login_skip))
             }
         }
     }

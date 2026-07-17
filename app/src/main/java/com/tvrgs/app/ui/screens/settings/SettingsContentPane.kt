@@ -22,6 +22,7 @@ internal fun SettingsContentPane(
     onAddProvider: () -> Unit,
     onEditProvider: (Provider) -> Unit,
     onNavigateToParentalControl: (Long) -> Unit,
+    onLogout: () -> Unit,
     onChooseRecordingFolder: () -> Unit,
     onUseUsbRecordingStorage: (() -> Unit)?,
     onCreateBackup: () -> Unit,
@@ -53,6 +54,7 @@ internal fun SettingsContentPane(
                 onAddProvider = onAddProvider,
                 onEditProvider = onEditProvider,
                 onNavigateToParentalControl = onNavigateToParentalControl,
+                onLogout = onLogout,
                 viewModel = viewModel,
                 providerState = providerState
             )

@@ -335,6 +335,9 @@
     <string name="settings_no_providers">No providers configured</string>
     <string name="settings_add_provider">Add Provider</string>
     <string name="settings_providers_subtitle">Switch, sync, edit, and troubleshoot your IPTV sources.</string>
+    <string name="settings_logout">Log out</string>
+    <string name="settings_logout_confirm_title">Log out?</string>
+    <string name="settings_logout_confirm_subtitle">This removes every saved login from this device. You\'ll need your username and password again to sign back in.</string>
     <string name="settings_provider_selector_hint">Select a provider to view details and actions.</string>
     <string name="settings_parental_control">Parental Control</string>
     <string name="settings_parental_subtitle">Protect adult or sensitive content with TV-friendly controls.</string>

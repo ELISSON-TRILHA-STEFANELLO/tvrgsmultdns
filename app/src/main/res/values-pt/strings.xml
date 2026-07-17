@@ -249,6 +249,9 @@
     <string name="settings_no_providers">Nenhum provedor configurado</string>
     <string name="settings_add_provider">Adicionar provedor</string>
     <string name="settings_providers_subtitle">Troque, sincronize, edite e solucione problemas de suas fontes de IPTV.</string>
+    <string name="settings_logout">Deslogar</string>
+    <string name="settings_logout_confirm_title">Deslogar?</string>
+    <string name="settings_logout_confirm_subtitle">Isso remove todos os logins salvos deste aparelho. Você vai precisar do usuário e senha novamente para entrar.</string>
     <string name="settings_provider_selector_hint">Selecione um provedor para visualizar detalhes e ações.</string>
     <string name="settings_parental_control">Controle dos Pais</string>
     <string name="settings_parental_subtitle">Proteja conteúdo adulto ou sensível com controles adequados para TV.</string>

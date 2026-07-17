@@ -1122,6 +1122,21 @@ class SettingsViewModel @Inject constructor(
         providerActions.deleteProvider(viewModelScope, providerId, onSuccess)
     }
 
+    /**
+     * Signs the client out: removes every saved login (provider) so the app has no active
+     * credentials left, then invokes [onComplete] so the caller can navigate back to the
+     * username/password screen. Best-effort per provider — one failing deletion doesn't stop
+     * the rest, since the goal is "no logins left" even if one entry is already broken.
+     */
+    fun logout(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.value.providers.forEach { provider ->
+                runCatching { providerRepository.deleteProvider(provider.id) }
+            }
+            onComplete()
+        }
+    }
+
     fun userMessageShown() {
         _uiState.update { it.copy(userMessage = null) }
     }
