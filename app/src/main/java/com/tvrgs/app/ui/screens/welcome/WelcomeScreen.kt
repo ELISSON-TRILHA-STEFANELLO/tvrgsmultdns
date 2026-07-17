@@ -2,6 +2,8 @@ package com.tvrgs.app.ui.screens.welcome
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -162,19 +164,22 @@ fun WelcomeScreen(
                 )
         )
 
-        when (hasProviders) {
-            false -> WelcomeStartCard(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(32.dp)
-            )
+        // Scrollable + centered: centers the card when it fits the screen, and lets it
+        // scroll instead of overflowing off-screen on shorter/lower-resolution displays.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            contentAlignment = Alignment.Center
+        ) {
+            when (hasProviders) {
+                false -> WelcomeStartCard(modifier = Modifier.padding(32.dp))
 
-            else -> WelcomeLoadingCard(
-                syncProgress = syncProgress,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(32.dp)
-            )
+                else -> WelcomeLoadingCard(
+                    syncProgress = syncProgress,
+                    modifier = Modifier.padding(32.dp)
+                )
+            }
         }
     }
 }

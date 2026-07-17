@@ -26,6 +26,8 @@
     <string name="welcome_login_title">Entrar</string>
     <string name="welcome_login_subtitle">Digite o usuário e a senha que você recebeu para começar a assistir.</string>
     <string name="welcome_login_button">Entrar</string>
+    <string name="setup_username">Usuário</string>
+    <string name="setup_password">Senha</string>
     <string name="welcome_login_connecting">Entrando…</string>
     <string name="welcome_login_error_generic">Não foi possível entrar. Confira o usuário e a senha e tente novamente.</string>
     <string name="welcome_login_skip">Navegar sem entrar</string>
