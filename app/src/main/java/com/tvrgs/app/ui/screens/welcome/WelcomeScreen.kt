@@ -279,7 +279,7 @@ private fun WelcomeStartCard(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Image(
-                painter = painterResource(R.mipmap.ic_launcher_vault),
+                painter = painterResource(R.drawable.ic_launcher_vault_art),
                 contentDescription = stringResource(R.string.app_name),
                 modifier = Modifier
                     .size(88.dp)
