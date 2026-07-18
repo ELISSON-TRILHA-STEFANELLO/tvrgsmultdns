@@ -80,6 +80,11 @@ internal fun RecordingDetailActions(
                 accent = ErrorColor,
                 onClick = onStop
             )
+            CompactRecordingActionChip(
+                label = stringResource(R.string.settings_recording_cancel),
+                accent = OnBackground,
+                onClick = onCancel
+            )
         }
         if (item.status == RecordingStatus.SCHEDULED) {
             CompactRecordingActionChip(
