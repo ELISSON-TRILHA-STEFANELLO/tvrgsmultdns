@@ -1,5 +1,9 @@
 package com.tvrgs.app.ui.screens.welcome
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
@@ -7,7 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,9 +19,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,7 +48,6 @@ import androidx.tv.material3.Text
 import com.tvrgs.app.BuildConfig
 import com.tvrgs.app.R
 import com.tvrgs.app.ui.components.LoginTextField
-import com.tvrgs.app.ui.components.shell.StatusPill
 import com.tvrgs.app.ui.design.AppColors
 import com.tvrgs.app.ui.interaction.TvButton
 import com.tvrgs.data.sync.SyncProgressBus
@@ -58,14 +60,10 @@ import com.tvrgs.domain.usecase.XtreamProviderSetupCommand
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -78,12 +76,10 @@ class WelcomeViewModel @Inject constructor(
     private val _hasProviders = MutableStateFlow<Boolean?>(null)
     val hasProviders: StateFlow<Boolean?> = _hasProviders.asStateFlow()
 
-    private val acceptingProgress = MutableStateFlow(true)
-
-    val syncProgress: StateFlow<SyncProgress?> =
-        combine(syncProgressBus.flow, acceptingProgress) { progress, accept ->
-            if (accept) progress else null
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    // Raw, unfiltered sync progress. `syncProgressBus` is an app-wide singleton, so the
+    // screen itself decides when a value is trustworthy (see WelcomeScreen's `syncProgress`,
+    // which only shows this while a login/sync attempt is actually in flight).
+    val syncProgress: StateFlow<SyncProgress?> = syncProgressBus.flow
 
     init {
         viewModelScope.launch {
@@ -91,12 +87,6 @@ class WelcomeViewModel @Inject constructor(
             providerRepository.getProviders()
                 .map { it.isNotEmpty() }
                 .collect { _hasProviders.value = it }
-        }
-        viewModelScope.launch {
-            _hasProviders
-                .filterNotNull()
-                .first()
-            acceptingProgress.value = false
         }
     }
 
@@ -136,16 +126,25 @@ fun WelcomeScreen(
     onNavigateToHome: () -> Unit,
     startupReady: Boolean = true,
     onNavigateToSetup: () -> Unit,
-    viewModel: WelcomeViewModel = hiltViewModel()
+    viewModel: WelcomeViewModel = hiltViewModel(),
+    loginViewModel: QuickLoginViewModel = hiltViewModel()
 ) {
     val hasProviders by viewModel.hasProviders.collectAsStateWithLifecycle()
-    val syncProgress by viewModel.syncProgress.collectAsStateWithLifecycle()
+    val rawSyncProgress by viewModel.syncProgress.collectAsStateWithLifecycle()
+    val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(hasProviders, startupReady) {
-        when (hasProviders) {
-            true -> if (startupReady) onNavigateToHome()
-            false -> Unit
-            null -> Unit
+    // SyncProgressBus is an app-wide singleton, so only trust its value while a login
+    // triggered from this screen is actually in flight — otherwise a stale reading from an
+    // earlier session could flash on screen for a frame.
+    val syncProgress = if (loginUiState.isSubmitting) rawSyncProgress else null
+
+    LaunchedEffect(hasProviders, startupReady, loginUiState.isSubmitting) {
+        // `hasProviders` flips true as soon as the login credentials are saved — which
+        // happens *before* the channels/movies/series/EPG sync that follows has finished.
+        // Waiting on `!isSubmitting` too means we only leave this screen once that sync is
+        // fully done, so Home opens with content already loaded instead of empty lists.
+        if (hasProviders == true && startupReady && !loginUiState.isSubmitting) {
+            onNavigateToHome()
         }
     }
 
@@ -172,16 +171,49 @@ fun WelcomeScreen(
                 .verticalScroll(rememberScrollState()),
             contentAlignment = Alignment.Center
         ) {
-            when (hasProviders) {
-                false -> WelcomeStartCard(modifier = Modifier.padding(32.dp))
-
-                else -> WelcomeLoadingCard(
-                    syncProgress = syncProgress,
-                    modifier = Modifier.padding(32.dp)
-                )
+            // Loading state covers both "still checking if a login exists" (null) and
+            // "logged in, syncing" (true) — only the confirmed-empty case shows the form.
+            val showLoadingCard = hasProviders != false
+            Crossfade(
+                targetState = showLoadingCard,
+                animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
+                label = "welcomeCardTransition"
+            ) { loading ->
+                if (loading) {
+                    WelcomeLoadingCard(
+                        syncProgress = syncProgress,
+                        modifier = Modifier.padding(32.dp)
+                    )
+                } else {
+                    WelcomeStartCard(
+                        loginViewModel = loginViewModel,
+                        modifier = Modifier.padding(32.dp)
+                    )
+                }
             }
         }
     }
+}
+
+/**
+ * Overall fraction (0f–1f) across the whole sync — channels, then movies, then series each
+ * count for a third of the ring, so it fills continuously across the three stages instead of
+ * resetting per section.
+ */
+private fun overallSyncFraction(progress: SyncProgress?): Float {
+    if (progress == null) return 0f
+    val sectionIndex = when (progress.section) {
+        Section.LIVE -> 0
+        Section.VOD -> 1
+        Section.SERIES -> 2
+    }
+    val sectionCount = 3
+    val sectionFraction = if (progress.total > 0) {
+        (progress.current.toFloat() / progress.total.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    return ((sectionIndex + sectionFraction) / sectionCount).coerceIn(0f, 1f)
 }
 
 @Composable
@@ -195,60 +227,67 @@ private fun WelcomeLoadingCard(
         colors = SurfaceDefaults.colors(containerColor = AppColors.Surface.copy(alpha = 0.9f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 36.dp, vertical = 28.dp),
+            modifier = Modifier.padding(horizontal = 36.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val pillLabel = if (syncProgress != null) {
-                stringResource(sectionLabelRes(syncProgress.section))
-            } else {
-                stringResource(R.string.app_name)
-            }
-            val pillColor = if (syncProgress != null) {
-                sectionColor(syncProgress.section)
-            } else {
-                AppColors.BrandMuted
-            }
-            StatusPill(
-                label = pillLabel,
-                containerColor = pillColor
+            val isDeterminate = syncProgress != null && syncProgress.total > 0
+            val animatedFraction by animateFloatAsState(
+                targetValue = overallSyncFraction(syncProgress),
+                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+                label = "syncRingProgress"
             )
-            Spacer(modifier = Modifier.height(18.dp))
-            if (syncProgress == null) {
-                CircularProgressIndicator(color = AppColors.Brand)
-                Spacer(modifier = Modifier.height(18.dp))
+
+            // The TVRGS logo sits inside a ring that fills as the sync advances — spinning
+            // indeterminately until the first section reports a real total, then animating
+            // smoothly toward 100% as channels, movies and series each complete.
+            Box(modifier = Modifier.size(132.dp), contentAlignment = Alignment.Center) {
+                if (isDeterminate) {
+                    CircularProgressIndicator(
+                        progress = { animatedFraction },
+                        modifier = Modifier.fillMaxSize(),
+                        color = AppColors.Brand,
+                        trackColor = AppColors.BrandMuted,
+                        strokeWidth = 6.dp
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        modifier = Modifier.fillMaxSize(),
+                        color = AppColors.Brand,
+                        trackColor = AppColors.BrandMuted,
+                        strokeWidth = 6.dp
+                    )
+                }
+                Image(
+                    painter = painterResource(R.drawable.ic_launcher_vault_art),
+                    contentDescription = stringResource(R.string.app_name),
+                    modifier = Modifier
+                        .size(94.dp)
+                        .clip(CircleShape)
+                )
             }
+
+            Spacer(modifier = Modifier.height(22.dp))
+
             Text(
                 text = stringResource(R.string.welcome_loading_title),
                 style = MaterialTheme.typography.titleLarge,
                 color = AppColors.TextPrimary
             )
             Spacer(modifier = Modifier.height(6.dp))
-            val subtitle = if (syncProgress != null && syncProgress.currentLabel.isNotBlank()) {
-                syncProgress.currentLabel
-            } else {
-                stringResource(R.string.welcome_loading_subtitle)
+
+            val subtitle = when {
+                syncProgress != null && syncProgress.currentLabel.isNotBlank() -> syncProgress.currentLabel
+                syncProgress != null -> stringResource(sectionLabelRes(syncProgress.section))
+                else -> stringResource(R.string.welcome_loading_subtitle)
             }
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyLarge,
-                color = AppColors.TextSecondary
+                color = AppColors.TextSecondary,
+                textAlign = TextAlign.Center
             )
+
             if (syncProgress != null) {
-                Spacer(modifier = Modifier.height(14.dp))
-                if (syncProgress.total > 0) {
-                    LinearProgressIndicator(
-                        progress = { syncProgress.current.toFloat() / syncProgress.total.toFloat() },
-                        modifier = Modifier.width(260.dp),
-                        color = AppColors.Brand,
-                        trackColor = AppColors.BrandMuted
-                    )
-                } else {
-                    LinearProgressIndicator(
-                        modifier = Modifier.width(260.dp),
-                        color = AppColors.Brand,
-                        trackColor = AppColors.BrandMuted
-                    )
-                }
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = stringResource(
@@ -265,8 +304,8 @@ private fun WelcomeLoadingCard(
 
 @Composable
 private fun WelcomeStartCard(
-    modifier: Modifier = Modifier,
-    loginViewModel: QuickLoginViewModel = hiltViewModel()
+    loginViewModel: QuickLoginViewModel,
+    modifier: Modifier = Modifier
 ) {
     val uiState by loginViewModel.uiState.collectAsStateWithLifecycle()
     val passwordFocusRequester = remember { FocusRequester() }
@@ -343,12 +382,6 @@ private fun WelcomeStartCard(
             }
         }
     }
-}
-
-private fun sectionColor(section: Section): Color = when (section) {
-    Section.LIVE -> AppColors.Brand
-    Section.VOD -> AppColors.Success
-    Section.SERIES -> AppColors.Warning
 }
 
 private fun sectionLabelRes(section: Section): Int = when (section) {

@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -34,8 +36,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -48,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.tvrgs.app.R
 import com.tvrgs.app.device.rememberIsTelevisionDevice
 import com.tvrgs.app.ui.interaction.mouseClickable
 import com.tvrgs.app.ui.theme.FocusBorder
@@ -148,14 +153,22 @@ fun LoginTextField(
             }
             .onFocusChanged { hasContainerFocus = enabled && it.isFocused }
             .focusProperties { canFocus = enabled }
-            .mouseClickable(enabled = enabled, focusRequester = focusRequester) { activateInput() }
-            .clickable(enabled = enabled) { activateInput() }
             .focusable(enabled = enabled)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.weight(1f)) {
+            // Only the text area (not the trailing eye icon below) activates input on tap —
+            // mouseClickable uses a raw pointerInteropFilter that, when attached to the whole
+            // field, claims every touch inside its bounds (including over the icon) before the
+            // icon's own clickable ever sees it. Scoping it to just this inner box lets a tap on
+            // the eye icon reach the icon's own click handler instead of always focusing the field.
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .mouseClickable(enabled = enabled, focusRequester = focusRequester) { activateInput() }
+                    .clickable(enabled = enabled) { activateInput() }
+            ) {
                 if (value.isEmpty() && !isFocused) {
                     Text(
                         text = placeholder,
@@ -216,14 +229,26 @@ fun LoginTextField(
             }
 
             if (isPassword && value.isNotEmpty()) {
-                Icon(
-                    imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                    contentDescription = null,
-                    tint = if (isFocused) Primary else OnSurfaceDim,
+                val toggleDescription = if (isPasswordVisible) {
+                    stringResource(id = R.string.setup_hide_password)
+                } else {
+                    stringResource(id = R.string.setup_show_password)
+                }
+                Box(
                     modifier = Modifier
-                        .padding(start = 8.dp)
+                        .padding(start = 4.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
                         .clickable(enabled = enabled) { isPasswordVisible = !isPasswordVisible }
-                )
+                        .semantics { contentDescription = toggleDescription },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = null,
+                        tint = if (isFocused) Primary else OnSurfaceDim
+                    )
+                }
             }
         }
     }
