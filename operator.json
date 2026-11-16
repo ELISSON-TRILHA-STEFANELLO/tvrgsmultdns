@@ -1,0 +1,35 @@
+{
+  "branding": {
+    "appName": "Meu IPTV",
+    "logoUrl": "https://seusite.com/logo.png",
+    "primaryColor": "#FF6B35",
+    "supportWhatsapp": "5511999999999",
+    "supportTelegram": "seusuporte",
+    "supportEmail": "suporte@seusite.com"
+  },
+  "panel": {
+    "showDnsManager": true,
+    "showProviderControl": true,
+    "showDiagnostics": true,
+    "pinCode": "1234",
+    "maintenanceMessage": "",
+    "minAppVersion": 17
+  },
+  "hosts": [
+    {
+      "name": "DNS Principal",
+      "url": "https://dns1.seusite.com",
+      "priority": 0
+    },
+    {
+      "name": "DNS Backup",
+      "url": "https://dns2.seusite.com",
+      "priority": 1
+    },
+    {
+      "name": "DNS Emergencial",
+      "url": "https://dns3.seusite.com",
+      "priority": 2
+    }
+  ]
+}
